@@ -172,7 +172,7 @@ class RGBDThread(QThread):
             # # dist,_,_,_ = cv2.mean(depthmap)
             # depth = New_depth_image[realY, realX].astype(float) * self.depth_scale * 1000   #因為存成ndarray所以變成y,x
             depth=self.align.process(frames).get_depth_frame().get_distance(realX, realY)*1000
-            return "Depth: "+str('%.2f'%depth)+"mm"
+            return depth
         except Exception as e:
             return e
         
@@ -202,12 +202,6 @@ class ArmThread(QThread):
         super(ArmThread,self).__init__()
         self._mutex = QMutex()
         self.grip = Gripper()     #夾爪控制
-        self.trans_mat = np.array([    #?
-            [0.6219,-0.0021,0.],
-            [-0.0028,-0.6218,0.],
-            [-337.3547,-163.6015,1.0]
-        ])
-        self.baseline_depth = 5850  #預設高度？
         self.pose = None
         self._running = True
         self.release = False
@@ -281,8 +275,9 @@ class ArmThread(QThread):
         self.release_trigger.emit (True)
 
     def goHome(self): #回正
-        self.robot.set_TMPos([463.1649544196957, -86.95035382249118, 402.50006103515625, -176.0176544189453, 0.5390074849128723, 46.80110931396485])       
-
+        #135度 self.robot.set_TMPos([100.46757778617632, 546.3748799610293, 405.3811340332031, 3.069622855659274, 0, 0.7746395918047735])
+        #原始座標
+        self.robot.set_TMPos([315.30413818359375, -457.3872680664063, 405.3842163085938, 3.0696167303887667, -1.108274100572733e-06, 0.7746365957485472])
     def reGrasp(self):
         # print("restart streaming")
         self._mutex.lock ()
@@ -335,7 +330,8 @@ class MainWindow(QMainWindow,Ui_MainWindow):
 
     def getDepthF(self):  #取得深度
         self.depth_value=self._stream_thread.getDepth()
-        self.OutPut.setText(str(self.depth_value))
+        
+        self.OutPut.setText("Depth: "+str('%.2f'%self.depth_value)+"mm")
     def FindPlaneF(self):  #??
         # self.FindPlane.setText("9")
         if(self.FindPlane.text() == "Step 1: Find Plane"):
@@ -352,142 +348,160 @@ class MainWindow(QMainWindow,Ui_MainWindow):
                 self.OutPut.append("------------\nFinished")
 
     def TestCalibrationF(self): #抓取點位並且復原 ？？
-        #TODO: Gripper grasp Plane
-        fr = open(sys.path[0] + "/calibration/PosSet.txt", 'r+')
-        dic = eval(fr.read())
-        fr.close()
-        GetPlanePos = StrToArray.StrToArray(dic['GetPlanePos'])
-        ObjectPos = StrToArray.StrToArray(dic['CaliPos'])
-        self._arm_thread.cntrl.move_robot_pos(GetPlanePos[0], GetPlanePos[1], GetPlanePos[2], GetPlanePos[3],
-                                              GetPlanePos[4], GetPlanePos[5], 2000)
-        self._arm_thread.cntrl.wait_move_end()
-        self.GripperCloseF()
-        time.sleep(1)  # time for Gripper Close
-        #TODO: Make 3 move
-        self._arm_thread.cntrl.move_robot_pos(ObjectPos[0][0], ObjectPos[0][1], ObjectPos[0][2], ObjectPos[0][3], ObjectPos[0][4], ObjectPos[0][5], 500)
-        self._arm_thread.cntrl.wait_move_end()
-        imageInFrame = self._rgb_image
-        image = self.convertQImageToMat(imageInFrame)
-        cv2.imshow("ETH Calibration Test",image)
-        cv2.waitKey(50)
-        #TODO: 不知道什么问题，但是要用waitkey刷新一下RGB Frame
-        imageInFrame = self._rgb_image
-        image = self.convertQImageToMat(imageInFrame)
-        cv2.imshow("ETH Calibration Test", image)
-        cv2.imwrite(sys.path[0] + "/calibration/EyeToHandCali/Test1.jpg", image)
-        cv2.waitKey(50)
+        # #TODO: Gripper grasp Plane
+        # fr = open(sys.path[0] + "/calibration/PosSet.txt", 'r+')
+        # dic = eval(fr.read())
+        # fr.close()
+        # GetPlanePos = StrToArray.StrToArray(dic['GetPlanePos'])
+        # ObjectPos = StrToArray.StrToArray(dic['CaliPos'])
+        # self._arm_thread.cntrl.move_robot_pos(GetPlanePos[0], GetPlanePos[1], GetPlanePos[2], GetPlanePos[3],
+        #                                       GetPlanePos[4], GetPlanePos[5], 2000)
+        # self._arm_thread.cntrl.wait_move_end()
+        # self.GripperCloseF()
+        # time.sleep(1)  # time for Gripper Close
+        # #TODO: Make 3 move
+        # self._arm_thread.cntrl.move_robot_pos(ObjectPos[0][0], ObjectPos[0][1], ObjectPos[0][2], ObjectPos[0][3], ObjectPos[0][4], ObjectPos[0][5], 500)
+        # self._arm_thread.cntrl.wait_move_end()
+        # imageInFrame = self._rgb_image
+        # image = self.convertQImageToMat(imageInFrame)
+        # cv2.imshow("ETH Calibration Test",image)
+        # cv2.waitKey(50)
+        # #TODO: 不知道什么问题，但是要用waitkey刷新一下RGB Frame
+        # imageInFrame = self._rgb_image
+        # image = self.convertQImageToMat(imageInFrame)
+        # cv2.imshow("ETH Calibration Test", image)
+        # cv2.imwrite(sys.path[0] + "/calibration/EyeToHandCali/Test1.jpg", image)
+        # cv2.waitKey(50)
 
-        self._arm_thread.cntrl.move_robot_pos(ObjectPos[5][0], ObjectPos[5][1], ObjectPos[5][2], ObjectPos[5][3],
-                                              ObjectPos[5][4], ObjectPos[5][5], 500)
-        self._arm_thread.cntrl.wait_move_end()
-        imageInFrame = self._rgb_image
-        image = self.convertQImageToMat(imageInFrame)
-        cv2.imshow("ETH Calibration Test", image)
-        cv2.waitKey(50)
-        #TODO: 不知道什么问题，但是要用waitkey刷新一下RGB Frame
-        imageInFrame = self._rgb_image
-        image = self.convertQImageToMat(imageInFrame)
-        cv2.imshow("ETH Calibration Test", image)
-        cv2.imwrite(sys.path[0] + "/calibration/EyeToHandCali/Test2.jpg", image)
-        cv2.waitKey(50)
+        # self._arm_thread.cntrl.move_robot_pos(ObjectPos[5][0], ObjectPos[5][1], ObjectPos[5][2], ObjectPos[5][3],
+        #                                       ObjectPos[5][4], ObjectPos[5][5], 500)
+        # self._arm_thread.cntrl.wait_move_end()
+        # imageInFrame = self._rgb_image
+        # image = self.convertQImageToMat(imageInFrame)
+        # cv2.imshow("ETH Calibration Test", image)
+        # cv2.waitKey(50)
+        # #TODO: 不知道什么问题，但是要用waitkey刷新一下RGB Frame
+        # imageInFrame = self._rgb_image
+        # image = self.convertQImageToMat(imageInFrame)
+        # cv2.imshow("ETH Calibration Test", image)
+        # cv2.imwrite(sys.path[0] + "/calibration/EyeToHandCali/Test2.jpg", image)
+        # cv2.waitKey(50)
 
-        self._arm_thread.cntrl.move_robot_pos(ObjectPos[8][0], ObjectPos[8][1], ObjectPos[8][2], ObjectPos[8][3],
-                                              ObjectPos[8][4], ObjectPos[8][5], 500)
-        self._arm_thread.cntrl.wait_move_end()
-        imageInFrame = self._rgb_image
-        image = self.convertQImageToMat(imageInFrame)
-        cv2.imshow("ETH Calibration Test", image)
-        cv2.waitKey(50)
-        #TODO: 不知道什么问题，但是要用waitkey刷新一下RGB Frame
-        imageInFrame = self._rgb_image
-        image = self.convertQImageToMat(imageInFrame)
-        cv2.imshow("ETH Calibration Test", image)
-        cv2.imwrite(sys.path[0] + "/calibration/EyeToHandCali/Test3.jpg", image)
-        cv2.destroyAllWindows()
-        #TODO:Calculate the result
-        EIHCali.TestETHCali()
-        #TODO: Put Chessboard Back
-        self._arm_thread.cntrl.move_robot_pos(GetPlanePos[0], GetPlanePos[1], GetPlanePos[2], GetPlanePos[3],
-                                              GetPlanePos[4], GetPlanePos[5], 2000)
-        self._arm_thread.cntrl.wait_move_end()
-        self.GripperOpenF()
-        time.sleep(1)  # Time for gripper open
-        self.SetInitPosF()
+        # self._arm_thread.cntrl.move_robot_pos(ObjectPos[8][0], ObjectPos[8][1], ObjectPos[8][2], ObjectPos[8][3],
+        #                                       ObjectPos[8][4], ObjectPos[8][5], 500)
+        # self._arm_thread.cntrl.wait_move_end()
+        # imageInFrame = self._rgb_image
+        # image = self.convertQImageToMat(imageInFrame)
+        # cv2.imshow("ETH Calibration Test", image)[0.5940838069345818, -0.1385408801148759, 0.46743569946289065, -3.0309942366798928, 0.028533363832244956, 0.7023456205905642]
+        # cv2.waitKey(50)
+        # #TODO: 不知道什么问题，但是要用waitkey刷新一下RGB Frame
+        # imageInFrame = self._rgb_image
+        # image = self.convertQImageToMat(imageInFrame)
+        # cv2.imshow("ETH Calibration Test", image)
+        # cv2.imwrite(sys.path[0] + "/calibration/EyeToHandCali/Test3.jpg", image)
+        # cv2.destroyAllWindows()
+        # #TODO:Calculate the result
+        # EIHCali.TestETHCali()
+        # #TODO: Put Chessboard Back
+        # self._arm_thread.cntrl.move_robot_pos(GetPlanePos[0], GetPlanePos[1], GetPlanePos[2], GetPlanePos[3],
+        #                                       GetPlanePos[4], GetPlanePos[5], 2000)
+        # self._arm_thread.cntrl.wait_move_end()[0.5940838069345818, -0.1385408801148759, 0.46743569946289065, -3.0309942366798928, 0.028533363832244956, 0.7023456205905642]
+        # self.GripperOpenF()
+        # time.sleep(1)  # Time for gripper open
+        # self.SetInitPosF()
+        pass
 
     def DebugCalibF(self): #?
-        result = EIHCali.ETHCali()
-        self.OutPut.setText("ETH Calibrate Finished\nT:\n" + str(result))
-        EIHCali.TestETHCali()
-
+        # result = EIHCali.ETHCali()
+        # self.OutPut.setText("ETH Calibrate Finished\nT:\n" + str(result))
+        # EIHCali.TestETHCali()
+        pass
+        
     def AutoEIHCalibF(self): #修正手眼校正中
-        shutil.rmtree(sys.path[0] + "/Saved_IMG") #清空資料夾
-        try:
-            if not os.path.exists(sys.path[0]+'/Saved_IMG'):
-                os.makedirs(sys.path[0]+'/Saved_IMG')
-            fr = open(sys.path[0] + "/EIH_PosSet.txt", 'r+')  #這時還沒有抓取joint的function所以使用position當作點位
-            #print(Total_pose)
-            # print(j)
-            id=1
-            Total_poses=[] #用來存成功的位置
-            Total_imgs=[]  #用來存成功的影像
-            for Pose in iter(fr):
-                Pose = Pose.split(', ')
-                print(Pose)
-                Pose = np.array(Pose, dtype="float")
-                print('Position:' + str(Pose)) 
-                #點位置自己重抓
-                self.Start2Stop()  #暫停影像
-                self._arm_thread.robot.set_TMPos([Pose[0], Pose[1], Pose[2], Pose[3], Pose[4], Pose[5]])
-                self.Start2Stop()  #恢復影像
-                # print('I am in ' + str(self._arm_thread.testArm()))
-                self.OutPut.setText("Begin EIH Calibration(NUM" + str(id) + ")")
-                w = 11
-                h = 8
-                criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-                objp = np.zeros((w * h, 3), np.float32)
-                objp[:, :2] = np.mgrid[0:w, 0:h].T.reshape(-1, 2)
-                # 储存棋盘格角点的世界坐标和图像坐标对
-
-                #在这里刷新一下Frame
-                imageInFrame = self._rgb_image
-                image = self.convertQImageToMat(imageInFrame)
-                cv2.imshow("EIH Calibration", image)
-                cv2.waitKey(50)
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-                # 找到棋盘格角点
-                ret, corners = cv2.findChessboardCorners(gray, (w, h), None)
-                # 如果找到足够点对，将其存储起来
-                if ret == True:
-                    Total_poses.append(Pose)
-                    #Total_imgs.append(image) 
-                    cv2.imwrite(sys.path[0] + "/Saved_IMG/RGB" + str(id) + ".png",image)
-                    print("saved:"+str(id)+"\n----------")
-                    cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
-                    cv2.drawChessboardCorners(image, (w, h), corners, ret)
-                    cv2.imshow("EIH Calibration", image)
-                    cv2.waitKey(300)
-                    id+=1
-                else:
-                    print("ERROR:No chessboard was found\n----------BREAK----------")
-                #self.Start2Stop()  #暫停影像
-                
-            cv2.destroyAllWindows()
-            self.SetInitPosF()
+        shutil.rmtree(sys.path[0] + "/Saved_IMG/") #清空資料夾
+        if not os.path.exists(sys.path[0]+'/Saved_IMG'):
+            os.makedirs(sys.path[0]+'/Saved_IMG')
+        fr = open(sys.path[0] + "/EIH_PosSet.txt", 'r+')  #這時還沒有抓取joint的function所以使用position當作點位
+        #print(Total_pose)
+        # print(j)
+        id = 1
+        Total_poses=[] #用來存成功的位置
+        for Pose in iter(fr):
+            #QApplication.processEvents()
+            Pose = Pose.replace('[', '').replace(']', '').replace('\n', '').split(', ')
+            #print(Pose)
+            Pose = np.array(Pose, dtype="float")
+            print('Position:' + str(Pose)) 
+            #點位置自己重抓 要轉45度
             
-            #assert(len(Total_poses)>=20) #要大於20張才能繼續 用在gripper到base座標轉換
-            #assert(len(Total_imgs)>=20)  #要大於20張才能繼續
-            print(self.intrinsic)
-            print(self.distCoeffs)
-            print(sys.path[0])
-            Task_r_Camera,Task_t_Camera=EIHCali.Find_Extrinsic(sys.path[0],self.intrinsic,self.distCoeffs)   #mtx  <class 'numpy.ndarray'>  ！！！！！！
-            print(Total_poses)
-            self.Camera2Gripper = EIHCali.EyeInHandCalibration(Total_poses,Task_r_Camera,Task_t_Camera)
-            result = EIHCali.EyeInHandCalibration(sys.path[0],Total_poses)
-            self.OutPut.setText("EIH Calibrate Finished\nT:\n"+str(result))
-            fr.close()
-        except Exception as e:
-            print(str(e))
+            # import math
+            # cos45 = math.cos(math.radians(45)) #往右轉45度
+            # sin45 = math.sin(math.radians(45))
+            # R2 = np.array([[cos45,-sin45,0],[sin45,cos45,0],[0,0,1]])
+            # ori_xyz = [Pose[0],Pose[1],Pose[2]]
+            # after_xyz = ori_xyz @ R2    
 
+            self._arm_thread.robot.set_TMPos([Pose[0],Pose[1],Pose[2], Pose[3], Pose[4], Pose[5]])  
+            # print('I am in ' + str(self._arm_thread.testArm()))
+            
+            #在这里刷新一下Frame  不然目前問題出在只會抓取前一pose畫面
+            cv2.waitKey(300)
+            self.OutPut.setText("Begin EIH Calibration(NUM" + str(id) + ")")
+            print("Begin EIH Calibration(NUM " + str(id) + " )")
+            w = 11
+            h = 8
+            criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+            # objp = np.zeros((w * h, 3), np.float32)
+            # objp[:, :2] = np.mgrid[0:w, 0:h].T.reshape(-1, 2)
+            # # 储存棋盘格角点的世界坐标和图像坐标对
+            
+            #self.updateRGBDFrame(self._rgb_image)
+            #QApplication.processEvents()
+            imageInFrame = self._rgb_image
+            image = self.convertQImageToMat(imageInFrame)
+            # cv2.imshow("EIH Calibration", image)
+            # cv2.waitKey(50)
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            # 找到棋盘格角点
+            ret, corners = cv2.findChessboardCorners(gray, (w, h), None)
+            # 如果找到足够点对，将其存储起来
+
+            if ret == True :
+                Total_poses.append(Pose)
+                #Total_imgs.append(image) 
+                cv2.imwrite(sys.path[0] + "/Saved_IMG/" + str(id) + ".png",image)
+                print("saved:"+str(id)+"\n----------")
+                sub_corners=cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
+                cv2.drawChessboardCorners(image, (w, h), sub_corners, ret)
+                cv2.imshow("EIH Calibration", image)
+                id+=1
+            else:
+                print("ERROR:No chessboard was found\n----------BREAK----------")
+            
+            cv2.waitKey(300)
+            #self.Start2Stop()  #恢復影像
+            #self.Start2Stop()  #暫停影像
+            
+            cv2.destroyAllWindows()
+
+        self.SetInitPosF()
+        
+        #assert(len(Total_poses)>=20) #要大於20張才能繼續 用在gripper到base座標轉換
+        #assert(len(Total_imgs)>=20)  #要大於20張才能繼續
+        print(self.intrinsic)
+        print(self.distCoeffs)
+        print(sys.path[0])
+        Task_r_Camera,Task_t_Camera=EIHCali.Find_Extrinsic(sys.path[0],self.intrinsic,self.distCoeffs)   #mtx  <class 'numpy.ndarray'>  ！！！！！！
+        print(Total_poses)
+        print(len(Task_r_Camera))
+        print(len(Task_t_Camera))
+        print("@@@@@@@@@@@@@@@@@")
+        self.Camera2Gripper = EIHCali.EyeInHandCalibration(Total_poses,Task_r_Camera,Task_t_Camera)
+        #result = EIHCali.EyeInHandCalibration(sys.path[0],Total_poses)
+        self.OutPut.setText("EIH Calibrate Finished\nT:\n"+str(self.Camera2Gripper))
+        np.save(sys.path[0]+'/Camera2Gripper.npy',np.asarray(self.Camera2Gripper))
+        fr.close()
+        
     def SetInitPosF(self):
         try:
             self.Start2Stop()  #暫停取像
@@ -629,13 +643,23 @@ class MainWindow(QMainWindow,Ui_MainWindow):
         # print(event.pos().y())
 
     def PenTouchTestF(self): #下爪點位測試
-        try:
-            Estimate_Coord= EIHCali.EstimateCoord(realX,realY,self.intrinsic,self.depth_value)
-            print(Estimate_Coord)
-            # self._arm_thread.cntrl.move_robot_pos(str(int(EstimateCoordResult[0])), str(int(EstimateCoordResult[1])), str(int(EstimateCoordResult[2])), -1710090 ,-24420 ,1620220 , 500)
-            # self._arm_thread.cntrl.wait_move_end()
-        except:
-            print("No point select!")
+        intrinsic=np.load(sys.path[0]+'/INS.npy')
+        Camera2Gripper=np.load(sys.path[0]+'/Camera2Gripper.npy')
+        [x,y,z,u,v,w]=self._arm_thread.robot.get_TMPos()
+        Estimate_Coord= EIHCali.EstimateCoord(realX,realY,intrinsic,float(self.depth_value),Camera2Gripper,Current_pos=[x,y,z,u,v,w])   
+        Estimate_Coord=np.asarray(Estimate_Coord)
+        print(Estimate_Coord)
+        print(type(Estimate_Coord))
+        self.OutPut.setText("Estimate_Coord:\n"+str(Estimate_Coord))
+        print(Estimate_Coord[0][0])
+        print(Estimate_Coord[1][0])
+        self._arm_thread.robot.set_TMPos([Estimate_Coord[0][0],Estimate_Coord[1][0],40,u,v,w])
+        # try:
+            
+        #     # self._arm_thread.cntrl.move_robot_pos(str(int(EstimateCoordResult[0])), str(int(EstimateCoordResult[1])), str(int(EstimateCoordResult[2])), -1710090 ,-24420 ,1620220 , 500)
+        #     # self._arm_thread.cntrl.wait_move_end()
+        # except Exception as e:
+        #     print(str(e))
 
     def convertQImageToMat(self,incomingImage):
         incomingImage = incomingImage.convertToFormat(4)
@@ -653,8 +677,8 @@ class MainWindow(QMainWindow,Ui_MainWindow):
         self.intrinsic,self.distCoeffs=EIHCali.CameraCalibration(sys.path[0])
         #to do np.save()
         
-        # np.save(sys.path[0]+'/INS.npy',np.asarray(mtx))
-        # np.save(sys.path[0]+'/dist.npy',np.asarray(dist))
+        np.save(sys.path[0]+'/INS.npy',np.asarray(self.intrinsic))
+        np.save(sys.path[0]+'/dist.npy',np.asarray(self.distCoeffs))
         dict = {'intrinsic': str(self.intrinsic), 'distCoeffs': str(self.distCoeffs)}
         fw = open(sys.path[0]+"/CameraCali.txt",'w+')
         fw.write(str(dict))
@@ -679,7 +703,7 @@ class MainWindow(QMainWindow,Ui_MainWindow):
             #ticks = time.time()
             # cv2.imwrite(sys.path[0]+"/saved/RGB" + str(ticks) + ".jpg",image)
             # cv2.imwrite(sys.path[0]+"/saved/D" + str(ticks) + ".jpg",depth_image)
-            cv2.imwrite(sys.path[0]+"/Saved_IMG/RGB" + str(self.cali_img_id) + ".png",image)
+            cv2.imwrite(sys.path[0]+"/Saved_IMG/" + str(self.cali_img_id) + ".png",image)
             #cv2.imwrite(sys.path[0]+"/Saved_IMG/D" + str(self.cali_img_id) + ".png",depth_image) #深度圖使用
             self.OutPut.setText("Saved:"+str(self.cali_img_id))
             self.cali_img_id +=1

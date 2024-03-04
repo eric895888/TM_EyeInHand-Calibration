@@ -16,10 +16,10 @@ import rospy
 from tm_msgs.msg import *
 from tm_msgs.srv import *
 
-# Chong: for matrix Rotation  因為這隻手必是斜45度
-cos45 = math.cos(math.radians(45))
-sin45 = math.sin(math.radians(45))
-R = np.array([[cos45,-sin45,0],[sin45,cos45,0],[0,0,1]])
+# Chong: for matrix Rotation  轉成常用的右邊x正前方y
+cos145 = math.cos(math.radians(135))
+sin145 = math.sin(math.radians(135))
+R = np.array([[cos145,-sin145,0],[sin145,cos145,0],[0,0,1]])
 
 mutex = QMutex()
 # Robot Arm move
@@ -115,19 +115,23 @@ class RobotControl_Func():
         # transself.set_TMPos_new(pos)form to TM robot coordinate
         tmp = []
         runnable = worker(tmp, speed, line)
-
+        cos135 = math.cos(math.radians(135))
+        sin135 = math.sin(math.radians(135))
+        R = np.array([[cos135,-sin135,0],[sin135,cos135,0],[0,0,1]])
         ori_xyz = [pos[0],pos[1],pos[2]]
-        after_xyz = ori_xyz @ R
+        after_xyz = ori_xyz 
         tmp.append(after_xyz[0] / 1000)
         tmp.append(after_xyz[1] / 1000)
         tmp.append(after_xyz[2] / 1000)
         #tmp.append(after_xyz[0]/1000)
         #tmp.append(after_xyz[1]/1000)
         #tmp.append(after_xyz[2]/1000)
-        tmp.append(pos[3] * np.pi / 180)
-        tmp.append(pos[4] * np.pi / 180)
-        tmp.append(pos[5] * np.pi / 180)
-
+        # tmp.append(pos[3] * np.pi / 180)
+        # tmp.append(pos[4] * np.pi / 180)
+        # tmp.append(pos[5] * np.pi / 180)
+        tmp.append(pos[3])
+        tmp.append(pos[4])
+        tmp.append(pos[5])
         self.threadDone = False
         runnable = worker(tmp, speed, line)
         runnable.mitter.done.connect(self.on_worker_done)
@@ -139,16 +143,20 @@ class RobotControl_Func():
     def get_TMPos(self):
         # listen to 'feedback_states' topic
         data = rospy.wait_for_message("/feedback_states", FeedbackState, timeout=None)
+        print("$$$$$$$")
         print(data.tool_pose)
-        print(data.tcp_speed)
-        cos45 = math.cos(math.radians(-45))
-        sin45 = math.sin(math.radians(-45))
-        R2 = np.array([[cos45,-sin45,0],[sin45,cos45,0],[0,0,1]])
-        
+        print("$$$$$$$")
+        # print("$$$$$$$$$$$$$$$$$$$444")
+        # print(data.tcp_speed)
+        # cos45 = math.cos(math.radians(45))
+        # sin45 = math.sin(math.radians(45))
+        # R2 = np.array([[cos45,-sin45,0],[sin45,cos45,0],[0,0,1]])
+        cos135 = math.cos(math.radians(-135))
+        sin135 = math.sin(math.radians(-135))
+        R = np.array([[cos135,-sin135,0],[sin135,cos135,0],[0,0,1]])
         current_pos = list(data.tool_pose)
         ori_xyz = [current_pos[0],current_pos[1],current_pos[2]]
-        after_xyz = ori_xyz @ R2
-        
+        after_xyz = ori_xyz  
         current_pos[0] = after_xyz[0] * 1000
         current_pos[1] = after_xyz[1] * 1000
         current_pos[2] = after_xyz[2] * 1000
@@ -156,8 +164,17 @@ class RobotControl_Func():
         #current_pos[0] = current_pos[0] * 1000
         #current_pos[1] = current_pos[1] * 1000
         #current_pos[2] = current_pos[2] * 1000
-        current_pos[3] = current_pos[3] * 180 / np.pi  #出來是角度
-        current_pos[4] = current_pos[4] * 180 / np.pi
-        current_pos[5] = current_pos[5] * 180 / np.pi
+        # current_pos[3] = current_pos[3] * 180 / np.pi  #出來是角度
+        # current_pos[4] = current_pos[4] * 180 / np.pi
+        # current_pos[5] = current_pos[5] * 180 / np.pi
+        current_pos[3] = current_pos[3] 
+        current_pos[4] = current_pos[4] 
+        current_pos[5] = current_pos[5] 
         # print(self.robot)
         return current_pos
+    
+    def get_TMJoint(self):
+        data = rospy.wait_for_message("/feedback_states", FeedbackState, timeout=None)
+        print("$$$$$$$")
+        print(data.joint_pos)
+        print("$$$$$$$")
